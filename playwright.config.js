@@ -65,6 +65,10 @@ module.exports = defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    // 不准改成每條都錄（'on'／'retain-on-failure'）：錄製開銷會改變時序，CI 上好讀類
+    // spec（PageDown 只送一次、游標即時移動）會整批假紅。失敗現場靠 screenshot＋video，
+    // CI 失敗時上傳 test-results/（.github/workflows/test.yml）。
+    // 守護 tests/unit/ci_playwright_container.test.js。
     trace: 'on-first-retry',
   },
   // 各 project 共用同一个 webServer（Vite dev server）：
