@@ -266,7 +266,7 @@ export function parseArticleTitle(text) {
 // compensates for it. The current '>' cursor is half-width and shifts nothing.
 export const LIST_AUTHOR_COL_START = 17;
 export const LIST_AUTHOR_COL_END = 29;
-export const LIST_TITLE_COL_START = 30;
+export const LIST_TITLE_COL_START = 7;
 const USERID_RE = /^[0-9A-Za-z]+$/;
 
 // The board-list keyboard cursor, TWO generations (pttbbs include/common.h):
