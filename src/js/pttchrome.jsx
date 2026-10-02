@@ -1968,7 +1968,7 @@ App.prototype.mouse_click = function(e) {
           : 0;
         // row 在好讀長頁會被 clamp，但 col 是純幾何（mouse_geometry.colFromClientX），
         // 兩種 render 分支都可信。
-        if (this.clientToPos(e.clientX, e.clientY).col >= pusherColStart) {
+        if (this.clientToPos(e.clientX, e.clientY).col <= (pusherColStart + 5) && e.clientX, e.clientY).col >= 5) {
           this.view.togglePusherHighlight(pusherEl.getAttribute('data-pusher'));
           e.preventDefault();
           return;
