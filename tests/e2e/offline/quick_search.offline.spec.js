@@ -1,5 +1,5 @@
 // 快速搜尋（右鍵選單）的真瀏覽器守門。unit 抓不到的兩件事在這裡守：
-//   1) **選單寬度是動態的**（jsdom 沒有 layout）：舊版 Menu width={220} 固定寬，
+//   1) **選單寬度是動態的**（unit 只掛單一元件、沒有 Mantine 全域樣式，量不到真寬度）：舊版 Menu width={220} 固定寬，
 //      「Google 搜尋 '長關鍵字'」會被擠成第二行。現在改成 max-content + max-width，
 //      長關鍵字必須「變寬但仍單行、超出用省略號」。
 //   2) 真的 window.open 出去的網址（含 encodeURIComponent）。
@@ -7,7 +7,7 @@
 // 不需 cassette：stub WebSocket 離線 boot 後直接餵畫面。
 const { test, expect } = require('@playwright/test');
 const ptt = require('../helpers/ptt');
-const { installReplay, waitConnected, feedRaw } = require('../helpers/replay');
+const { installReplay, waitConnected, feedRaw, waitScreenSettled } = require('../helpers/replay');
 const { waitRectStable } = require('../helpers/layout');
 const { rightClickSelectedText } = require('../helpers/real_input');
 
@@ -44,7 +44,7 @@ async function boot(page, { prefs } = {}) {
 
 async function feedLine(page, text) {
   await feedRaw(page, '\x1b[2J\x1b[H' + text);
-  await page.waitForTimeout(200);
+  await waitScreenSettled(page);
 }
 
 const quickItems = page => page.locator('.DropdownMenu__QuickSearch');

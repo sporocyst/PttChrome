@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-// 設定面板「AI」分頁的 UI 契約（jsdom + @testing-library/react）。
+// @unit-env browser
+// 設定面板「AI」分頁的 UI 契約（真 Chromium + @testing-library/react）。
 // 守的是使用者定案的三條規則：
 //   1) 總開關 enableAi 是**總閘門**——關閉時所有子選項反灰，但值原樣保留。
 //   2) 未支援／裝置不符的瀏覽器：分頁照常顯示，總開關與子選項全部反灰。
@@ -31,28 +31,6 @@ vi.mock("../../src/js/prompt_api", () => ({
 }));
 
 const PREF_KEY = "pttchrome.pref.v1";
-
-// jsdom 沒有 matchMedia / ResizeObserver，Mantine 的 useMantineColorScheme 與
-// Modal 會直接炸。最小 stub，與被測行為無關。
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 const renderModal = (prefs = {}) => {
   window.localStorage.setItem(
@@ -194,6 +172,4 @@ describe("AI 分頁：模型下載", () => {
 });
 
 // 「AI 設定已全數移出增強功能分頁」守在 offline e2e
-// （tests/e2e/offline/ui_behavior.offline.spec.js 的分頁切換那條）：enhance 分頁
-// 有 Mantine autosize Textarea，jsdom 缺 layout API 會讓它在 mount 時就炸，
-// 這條只有真瀏覽器測得動。
+// （tests/e2e/offline/ui_behavior.offline.spec.js 的分頁切換那條），這裡不重複。

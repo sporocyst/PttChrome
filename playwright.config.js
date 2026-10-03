@@ -1,5 +1,11 @@
 const { defineConfig, devices } = require('@playwright/test');
 const { e2eWorkers } = require('./tests/e2e/workers_policy');
+const { assertNotWorktree } = require('./scripts/worktree');
+
+// git worktree 裡禁跑任何 Playwright project（exit 2），理由與逃生門見 scripts/worktree.js。
+// 放在 config 而非 package.json：直接 `npx playwright test` 也擋得到。
+// unit 會 import 本檔讀設定（VITEST 由 vitest 設定），不可在那時 exit。
+if (!process.env.VITEST) assertNotWorktree('Playwright e2e');
 
 // 逆境 project 的 spec 清單（詳見下方 offline-slow 的註解）。
 // 這兩個常數被 tests/unit/e2e_layout_settle.test.js 讀去做靜態守護，改名要一起改。
@@ -90,7 +96,7 @@ module.exports = defineConfig({
       name: 'live',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['preflight'],
-      testIgnore: ['offline/**', 'tools/**', 'preflight.setup.js'],
+      testIgnore: ['offline/**', 'android/**', 'tools/**', 'preflight.setup.js'],
     },
     {
       name: 'offline',
@@ -179,6 +185,17 @@ module.exports = defineConfig({
       fullyParallel: true,
       timeout: 300000,
       testMatch: ADVERSE_LAYOUT_SPECS,
+    },
+    {
+      // android：真 Android Chrome（模擬器）。`yarn test:e2e:android`（scripts/run-android-e2e.mjs）
+      // 負責找／開模擬器；page/context 由 android/fixtures.js 覆寫成手機裡的 Chrome，
+      // 桌機瀏覽器不會啟動。只有一台模擬器 ⇒ 名稱不得以 offline 開頭（workers_policy 恆 1）。
+      // 見 docs/android-e2e.md。
+      name: 'android',
+      timeout: 120000,
+      // 錄影走桌機 screencast，launchBrowser 的 context 不支援；失敗現場留截圖。
+      use: { video: 'off', trace: 'off' },
+      testMatch: 'android/**/*.android.spec.js',
     },
     {
       name: 'record',

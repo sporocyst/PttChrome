@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 設定面板「快速搜尋」分頁的 UI 契約。
 // 內建項目只能停用（pref 只存被停用的 id，見 pref_storage.js#quickSearchDisabled），
 // 自訂項目可新增／編輯／刪除；全部走既有的「關閉時才寫入 localStorage」路徑。
@@ -23,25 +23,6 @@ vi.mock("../../src/js/prompt_api", () => ({
 
 const PREF_KEY = "pttchrome.pref.v1";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 const openTab = (prefs = {}) => {
   window.localStorage.setItem(

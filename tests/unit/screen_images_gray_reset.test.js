@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 「換文章卻還有幾張莫名其妙的灰圖」的回歸守護（比照 screen_images_enlarged_reset）。
 //
 // 單張圖的灰階態放在 module 級的 Set（鍵＝href，見 src/render/inline_preview_slot.js
@@ -93,14 +93,13 @@ function mount() {
 const slotEl = () => controller.container.querySelector(".inlinePreviewSlot");
 const grayAttr = () => slotEl().getAttribute("data-gray");
 
-// jsdom 不排版也不載圖：灰階鈕只在「content 裡剛好一張已佈局的 img」時才建立，
-// 所以兩件事都得自己造出來。
+// 灰階鈕只在「content 裡剛好一張已佈局的 img」時才建立。測試不連網：用明確的
+// CSS 尺寸代替「圖載完撐開」，寬度由真版面量出。
 function loadImageAndToggle() {
   const content = slotEl().querySelector(".inlinePreviewContent");
   const img = document.createElement("img");
   img.className = "easyReadingImg hyperLinkPreview";
-  Object.defineProperty(img, "offsetWidth", { configurable: true, value: 600 });
-  Object.defineProperty(img, "offsetHeight", { configurable: true, value: 400 });
+  img.style.cssText = "display: block; width: 600px; height: 400px";
   content.appendChild(img);
   emitResize();
   const btn = slotEl().querySelector(".previewGrayBtn");
@@ -112,16 +111,16 @@ describe("換文章重置單張圖的灰階", () => {
   beforeEach(() => {
     sizeObservers.length = 0;
     resetLazyObserversForTest();
-    global.IntersectionObserver = FakeIO;
-    global.ResizeObserver = FakeRO;
+    globalThis.IntersectionObserver = FakeIO;
+    globalThis.ResizeObserver = FakeRO;
     mount();
   });
 
   afterEach(() => {
     controller.destroy();
     root.remove();
-    delete global.IntersectionObserver;
-    delete global.ResizeObserver;
+    delete globalThis.IntersectionObserver;
+    delete globalThis.ResizeObserver;
     resetLazyObserversForTest();
   });
 

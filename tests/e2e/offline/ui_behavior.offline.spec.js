@@ -8,7 +8,7 @@
 // 不需任何 cassette：stub WebSocket 离线 boot 後直接操作 UI。
 const { test, expect } = require('@playwright/test');
 const ptt = require('../helpers/ptt');
-const { installReplay, waitConnected, feedRaw } = require('../helpers/replay');
+const { installReplay, waitConnected, feedRaw, waitScreenSettled } = require('../helpers/replay');
 const { rightClickSelectedText } = require('../helpers/real_input');
 const { waitRectStable, elementUnder } = require('../helpers/layout');
 
@@ -18,7 +18,7 @@ const label = (page, key) => page.evaluate(k => window.__i18n(k), key);
 // 右鍵叫出 context menu（無選取 → normalEnabled 路徑）。
 async function openContextMenu(page) {
   await feedRaw(page, '\x1b[2J\x1b[H  CONTEXT MENU TEST LINE  ');
-  await page.waitForTimeout(200);
+  await waitScreenSettled(page);
   await page.locator('#BBSWindow').click({ button: 'right', position: { x: 40, y: 20 } });
 }
 
@@ -415,10 +415,8 @@ test.describe('UI 行為（offline，跨 bootstrap 版本守門）', () => {
 
     const wNarrow = await modalWidth(page);
     await page.setViewportSize({ width: 1400, height: 800 });
-    await page.waitForTimeout(100);
+    await expect.poll(() => modalWidth(page)).toBeGreaterThan(wNarrow); // 空間夠就變寬
     const wWide = await modalWidth(page);
-
-    expect(wWide).toBeGreaterThan(wNarrow); // 空間夠就變寬
     expect(wWide).toBeLessThanOrEqual(920); // 但有上限（size=900px + 邊距餘裕）
   });
 
@@ -566,7 +564,7 @@ test.describe('UI 行為（offline，跨 bootstrap 版本守門）', () => {
 
   // 回歸：doCopy 由 execCommand('copy')+DOM copy 事件攔截改為
   // navigator.clipboard.writeText 後，真瀏覽器的「選取 → 右鍵複製 → 系統剪貼簿」
-  // 全鏈必須仍通。jsdom 驗不到 Clipboard API 的 secure context/權限行為，只能在此守。
+  // 全鏈必須仍通。unit 不走真的右鍵選單全鏈，也不涵蓋 Clipboard API 的權限行為，只能在此守。
   test('右鍵選單「複製」：選取文字後寫入系統剪貼簿', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await installReplay(page);
@@ -574,7 +572,7 @@ test.describe('UI 行為（offline，跨 bootstrap 版本守門）', () => {
     await waitConnected(page);
 
     await feedRaw(page, '\x1b[2J\x1b[HCOPYSMOKE');
-    await page.waitForTimeout(200);
+    await waitScreenSettled(page);
 
     // 真滑鼠拖曳選字 → 在選取範圍內按真右鍵（helpers/real_input）。
     await rightClickSelectedText(page, 'COPYSMOKE');

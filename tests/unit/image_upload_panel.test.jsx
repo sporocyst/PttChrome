@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 上傳浮層的渲染與「不可以被終端機吃掉」的守護。
 //
 // 這一層**不是 modal**（終端機要繼續收鍵盤），所以擋不住 pttchrome 的 mouse_*；
@@ -18,17 +18,6 @@ import {
 } from "../../src/js/image_upload_controller";
 import { setupI18n, i18n } from "../../src/js/i18n";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
 
 setupI18n();
 

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 斷線提示的診斷結果呈現（診斷邏輯本身見 connection_probe.test.js）。
 //   origin      ⇒ 「Origin 偽裝設定不正確或未設定」＋設定教學連結＋「改用 Proxy？」
 //   unreachable ⇒ PTT／網路問題；不問 proxy（proxy 也探測失敗，開了沒用）
@@ -9,17 +9,6 @@ import ConnectionAlert from "../../src/components/ConnectionAlert";
 import { ORIGIN_SETUP_URL } from "../../src/js/connection_probe";
 import { setupI18n, i18n } from "../../src/js/i18n";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
 
 const deferred = () => {
   let resolve;

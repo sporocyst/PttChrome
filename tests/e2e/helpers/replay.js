@@ -182,6 +182,20 @@ async function feedRaw(page, latin1) {
   await page.evaluate((s) => window.__app.onData(s), latin1);
 }
 
+// 等剛餵進去的那一幀**真的生效**：rows（{ 列號: 該列應含的字 }）都進了 buf，而且
+// 30ms 的 notify（pageState／畫面）與 50ms 的 settle（CommandQueue／狀態機在這裡
+// 判讀這一幀）都跑完了。取代「餵完固定 sleep」：renderer 一忙，sleep 就不夠，
+// 狀態機還沒看到這一幀測試就往下走。
+async function waitScreenSettled(page, rows = {}) {
+  await page.waitForFunction((map) => {
+    const buf = window.__app.buf;
+    if (buf.timerUpdate || buf._settleTimer) return false;
+    return Object.keys(map).every((k) =>
+      buf.getRowText(Number(k), 0, buf.cols).includes(map[k].trim())
+    );
+  }, rows);
+}
+
 // 重放一卷 cassette。
 //   opts.easyReading（预设 true）：进好读、逐页累积（翻页回归 / End→原生 / 行内开图 / 楼层 / 黑名单 / pusher）。
 //   opts.easyReading=false：静态单页（看板列表黑名单 / 作者栏），只喂 start step、不进好读。
@@ -345,7 +359,9 @@ async function replayCassette(page, cassette, opts = {}) {
     const st = await page.evaluate(() => window.__replay).catch(() => null);
     console.log('replayCassette 未喂完所有 step（可能 cassette 与当前逻辑不符）：', JSON.stringify(st));
   }
-  await page.waitForTimeout(300); // 让最后一页 settle/render flush
+  // 让最后一页 settle/render flush：渲染在 notify 里同步完成（无 rAF），好读的
+  // 后续反应挂在 settle 上 ⇒ 两个计时器都清空才算这一页真的落地。
+  await waitScreenSettled(page);
 }
 
 // 重放一卷「list 多 step」cassette（tools/record-cassette.spec.js 的
@@ -751,6 +767,7 @@ module.exports = {
   installReplay,
   waitConnected,
   feedRaw,
+  waitScreenSettled,
   replayCassette,
   replayListCassette,
   bootOffline,

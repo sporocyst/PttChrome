@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 斷線提示（ConnectionAlert）掛在 window capture 階段的 keydown 攔截器。
 //
 // 回歸守護（實際回報：PTT 維護期間開設定頁，欄位完全打不了字）：原本的攔截器對
@@ -13,17 +13,6 @@ import { MantineProvider } from "@mantine/core";
 import ConnectionAlert from "../../src/components/ConnectionAlert";
 import { setupI18n, i18n } from "../../src/js/i18n";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
 
 const onDismiss = vi.fn();
 

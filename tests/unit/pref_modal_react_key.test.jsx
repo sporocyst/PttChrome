@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 「關於」分頁的 i18n 字串內嵌連結：replaceI18n 回傳陣列，裡面的 <Anchor>
 // 必須有 key，否則一開設定頁就噴 React「unique key」警告（Tabs keepMounted
 // ⇒ 不用點開「關於」也會渲染）。
@@ -28,25 +28,6 @@ vi.mock("../../src/js/prompt_api", () => ({
   destroyPromptApi: vi.fn(),
 }));
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 beforeAll(() => {
   setupI18n();

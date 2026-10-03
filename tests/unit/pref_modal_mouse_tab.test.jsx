@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 設定面板「滑鼠」分頁的 UI 契約（2026-08 整套滑鼠功能重新設計）。
 //
 // 守住三件事：
@@ -31,25 +31,6 @@ vi.mock("../../src/js/prompt_api", () => ({
 
 const PREF_KEY = "pttchrome.pref.v1";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 const openModal = (prefs = {}) => {
   window.localStorage.setItem(

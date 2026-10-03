@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // real-input: tests/e2e/offline/long_push_image_upload.offline.spec.js
 //   （「截圖 Ctrl+V 貼進輸入框」；本檔手捏事件只測分支邏輯，見 tests/unit/e2e_real_input.test.js）
 // 長推文輸入框（src/components/ContextMenu/LongPushModal.jsx）。
@@ -18,33 +18,6 @@ import {
   clearDraft,
   resetDraftCacheForTests,
 } from "../../src/js/long_push_draft";
-
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
-// Mantine 的 Textarea autosize 會掛在 document.fonts 的 loadingdone 上（等字體
-// 載完重算高度），jsdom 沒有 FontFaceSet ⇒ 不補會在 mount 就 throw。
-if (!document.fonts)
-  Object.defineProperty(document, "fonts", {
-    value: { addEventListener() {}, removeEventListener() {} },
-    configurable: true,
-  });
 
 beforeAll(() => {
   loadBig5Tables();
@@ -264,7 +237,8 @@ describe("圖片上傳插入目標", () => {
   test("Textarea 的貼上轉給 tryClipboardImage（截圖直接 Ctrl+V）", () => {
     const imageUpload = fakeUpload();
     renderModal({ imageUpload });
-    fireEvent.paste(textarea(), { clipboardData: { files: [], items: [] } });
+    // 真 Chromium 的 ClipboardEvent 只收真的 DataTransfer（空的＝沒有圖）。
+    fireEvent.paste(textarea(), { clipboardData: new DataTransfer() });
     expect(imageUpload.tryClipboardImage).toHaveBeenCalled();
   });
 

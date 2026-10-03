@@ -10,7 +10,7 @@
 //   - 取消送出 Ctrl-C 收尾
 const { test, expect } = require('@playwright/test');
 const ptt = require('../helpers/ptt');
-const { bootOffline, feedRaw } = require('../helpers/replay');
+const { bootOffline, feedRaw, waitScreenSettled } = require('../helpers/replay');
 const {
   rightClickPlainText,
   imeSetComposition,
@@ -59,7 +59,7 @@ async function drawRows(page, rows) {
       data += '\x1b[' + (Number(k) + 1) + ';1H' + u2b(map[k]);
     window.__app.onData(data);
   }, rows);
-  await page.waitForTimeout(300);
+  await waitScreenSettled(page, rows);
 }
 
 // 完整的文章畫面（標頭＋網址列＋pmore 狀態列）。
@@ -127,7 +127,7 @@ async function drawBoardList(page, rows, cursorRow) {
     },
     { rows, curY: 3 + cursorRow }
   );
-  await page.waitForTimeout(300);
+  await waitScreenSettled(page, { 2: '編號', 23: '文章選讀' });
 }
 
 async function drawLastRow(page, text) {
@@ -149,7 +149,7 @@ async function drawLastRow(page, text) {
     window.__app.onData('\x1b[2J\x1b[24;1H' + u2b(s));
   }, text);
   // settle 是 50ms 的安靜窗，等它 dispatch 之後 CommandQueue 才判得到這一幀。
-  await page.waitForTimeout(300);
+  await waitScreenSettled(page, { 23: text });
 }
 
 async function collectSent(page) {
@@ -300,8 +300,8 @@ test.describe('長推文一鍵發送（離線）', () => {
 
   // 鍵盤送出。unit（long_push_modal.test.jsx）已經守了「Ctrl+Enter 會呼叫
   // onConfirm」，這裡守只有真瀏覽器看得到的兩件事：
-  //   1. preventDefault 真的擋掉了 textarea 自己的換行（jsdom 不會插那個字元，
-  //      fireEvent 的回傳值只證明「有呼叫 preventDefault」）——送不出去的空白狀態
+  //   1. preventDefault 真的擋掉了 textarea 自己的換行（fireEvent 送的合成事件不會
+  //      觸發瀏覽器預設動作，本來就不會插那個字元；它的回傳值只證明「有呼叫 preventDefault」）——送不出去的空白狀態
   //      下按一次最看得出來：框還開著，內容必須仍是空的。
   //   2. 這一下沒漏給 PTT：modalShown 擋著 term_view 的 global keydown，線路上
   //      第一個 byte 必須就是長推文自己送的 X。
@@ -378,7 +378,9 @@ test.describe('長推文一鍵發送（離線）', () => {
     await drawLastRow(page, TYPE_MENU);
     await drawLastRow(page, PROMPT);
 
+    // 鎖在進度對話框裡找：輸入框的「取消」可能還在關閉動畫中，全域找會撞到兩顆。
     await page
+      .getByRole('dialog', { name: await label(page, 'longPushProgress_title') })
       .getByRole('button', { name: await label(page, 'longPushProgress_cancel') })
       .click();
     // vgetstring 的 Ctrl-C＝清空 + abort ⇒ recommend() 什麼都不寫就 return。
@@ -747,7 +749,7 @@ test.describe('長推文一鍵發送（離線）', () => {
         },
         { rows: { 0: ARTICLE_HEADER, 1: ARTICLE_TITLE, 20: ARTICLE_URL }, footer }
       );
-      await page.waitForTimeout(300);
+      await waitScreenSettled(page, { 0: ARTICLE_HEADER, 23: footer });
     };
     const footerAt = (page1, page2, pct, start, end) =>
       `  瀏覽 第 ${page1}/${page2} 頁 (${String(pct).padStart(3)}%)  ` +

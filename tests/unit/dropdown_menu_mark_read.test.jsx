@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 右鍵選單的「前已讀後未讀」項：有目標才畫、點下去要走 markReadUnread handler。
 //
 // gating 刻意**全部**收在 list_session.markReadTargetAtRow（狀態／置底文／header
@@ -10,24 +10,6 @@ import { setupI18n, i18n } from "../../src/js/i18n";
 import { zh_TW } from "../../src/js/zh_TW_messages";
 import { en_US } from "../../src/js/en_US_messages";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
 
 const renderMenu = (props = {}) =>
   render(

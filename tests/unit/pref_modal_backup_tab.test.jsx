@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-// 設定面板「設定備份」分頁的 UI 契約（jsdom + @testing-library/react）。
+// @unit-env browser
+// 設定面板「設定備份」分頁的 UI 契約（真 Chromium + @testing-library/react）。
 // 這個分頁收三件事：匯出成檔案、從檔案匯入、雲端同步（從一般分頁搬過來）。
 // 守的重點：
 //   1) 匯出檔**永遠不含** PTT 帳號／密碼／2FA 金鑰（純邏輯的回歸在
@@ -28,7 +28,7 @@ vi.mock("../../src/js/prompt_api", () => ({
   destroyPromptApi: vi.fn(),
 }));
 
-// 只換掉 downloadAsFile（jsdom 沒有真的下載），其餘照原樣（PrefModal 也用
+// 只換掉 downloadAsFile（測試要攔下匯出內容，也不該真的觸發下載），其餘照原樣（PrefModal 也用
 // DEFAULT_PROXY_HOST）。
 vi.mock("../../src/js/util", async (importOriginal) => ({
   ...(await importOriginal()),
@@ -36,28 +36,6 @@ vi.mock("../../src/js/util", async (importOriginal) => ({
 }));
 
 const PREF_KEY = "pttchrome.pref.v1";
-
-// jsdom 沒有 matchMedia / ResizeObserver，Mantine 的 useMantineColorScheme 與
-// Modal 會直接炸。最小 stub，與被測行為無關。
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 const onReset = vi.fn();
 

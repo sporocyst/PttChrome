@@ -208,7 +208,7 @@ function ensureSizeObserver() {
   });
 }
 
-// 測試用逃生門：jsdom 沒有 IntersectionObserver，測試會注入一個假的，之後必須能
+// 測試用逃生門：測試要同步控制交集回呼時會注入假的 IntersectionObserver，之後必須能
 // 把 module 級的 observer 丟掉重建。量測 memo 同為 module 級狀態，一併清掉 ——
 // 既有測試都已在 beforeEach/afterEach 呼叫它，跨測試隔離因此自動成立。
 export function resetLazyObserversForTest() {
@@ -331,7 +331,7 @@ export function createInlinePreviewSlot(href, sizeMode = "normal") {
   // 只有「content 裡剛好一張、而且已經佈局出來」的 <img> 才配按鈕：
   //   * 非媒體 slot（「※ 文章網址」那行）、影片、iframe、相簿（多張）不該長出
   //     一顆指涉不明的按鈕；
-  //   * 連帶讓 jsdom（圖片永不載入 ⇒ offsetWidth 恆 0）完全不會生成它 ⇒
+  //   * 連帶讓 golden 快照（掛載當下圖片還沒載入 ⇒ offsetWidth 恆 0）不會生成它 ⇒
   //     tests/unit/fixtures/screen_golden/*.html 不受影響。
   function singleLaidOutImage() {
     const imgs = content.querySelectorAll("img.easyReadingImg");
@@ -597,7 +597,7 @@ export function createInlinePreviewSlot(href, sizeMode = "normal") {
       farObs.unobserve(node);
     });
   } else {
-    // 不支援 IntersectionObserver（jsdom／很舊的環境）⇒ 直接照舊立即掛載，
+    // 不支援 IntersectionObserver（測試刻意藏起來／很舊的環境）⇒ 直接照舊立即掛載，
     // 行為與這個功能不存在時完全相同。
     mount();
   }

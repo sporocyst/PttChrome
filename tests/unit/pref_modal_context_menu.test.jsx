@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 設定頁「一般 → 右鍵選單」區塊：兩個小幫手的顯示開關。
 //
 // 這兩項**預設關**（enableInputHelper / enableLiveArticleHelper）—— 它們是小眾
@@ -28,25 +28,6 @@ vi.mock("../../src/js/prompt_api", () => ({
 
 const PREF_KEY = "pttchrome.pref.v1";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 const openGeneralTab = (prefs = {}, onSave = () => {}) => {
   window.localStorage.setItem(

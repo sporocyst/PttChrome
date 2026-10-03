@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // 設定面板「游標所在列」區塊的 UI 契約（2026-08-15 從「滑鼠瀏覽」拆出，
 // 2026-08-26 加入樣式層）。分兩層：
 //   來源層（哪一列）  滑鼠停留開關（住「滑鼠」分頁）、鍵盤游標開關
@@ -26,25 +26,6 @@ vi.mock("../../src/js/prompt_api", () => ({
 
 const PREF_KEY = "pttchrome.pref.v1";
 
-window.matchMedia =
-  window.matchMedia ||
-  (() => ({
-    matches: false,
-    media: "",
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }));
-window.ResizeObserver =
-  window.ResizeObserver ||
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-window.scrollTo = window.scrollTo || (() => {});
 
 // 「一般」分頁是預設分頁，開啟即是。**滑鼠停留底色已搬到「滑鼠」分頁**（2026-08
 // 滑鼠功能重新設計），這裡只剩鍵盤游標開關與兩者共用的顏色色票。

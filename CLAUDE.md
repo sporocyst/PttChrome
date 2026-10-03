@@ -13,9 +13,9 @@ BBS 畫面每收到一頁就整份重畫，React 在這裡只剩成本（實錄�
 ## 跑起來（踩雷點，務必照做）
 - 啟動 dev server：`yarn start` → http://localhost:8080（= `vite`）
   - **收工前務必手動關掉：`yarn kill:dev`**。這是規範不是自動化——**只要這個 session 起過 dev server（`yarn start`），結束前就要自己跑一次**，別指望 hook。
-    - `.claude/settings.json` 的 hook 只在 SessionEnd 殺 Claude 自己開的 server。不要加 Stop hook：它每個 assistant turn 結束都會觸發，會砍掉 Playwright 自己起的 dev server，讓 e2e 整批 `ERR_CONNECTION_REFUSED`。
+    - `.claude/settings.json` 的 hook 只在 SessionEnd 跑 `kill-dev-server.js --own`：只殺本 checkout 的 vite（PID 由 `vite.config.mjs` 寫 pidfile），不碰別的 session／worktree 的 server。不要加 Stop hook：它每個 assistant turn 結束都會觸發，會砍掉 Playwright 自己起的 dev server，讓 e2e 整批 `ERR_CONNECTION_REFUSED`。
   - Windows 上 vite 只綁 IPv6 `[::1]:8080`，所以 `kill-dev-server.js` 用不帶 `-p` 的 `netstat -ano` 篩 PID（守護 `tests/unit/kill_dev_server_parse.test.js`）。
-  - 用 **Node**（dev server ≥20.19；`test:unit` 的 jsdom 30 另需 `^22.22.2 || ^24.15.0 || >=26` → 裝最新 v24）跑，**不要用 bun**（bun 的 ws proxy 不轉發 upgrade）。
+  - 用 **Node**（dev server ≥20.19；Vitest 5 需 ≥22 → 裝最新 v24）跑，**不要用 bun**（bun 的 ws proxy 不轉發 upgrade）。
   - 套件管理用 **yarn**（Yarn v4，`node-modules` linker，設定於 `.yarnrc.yml`）。Node 內建 corepack：`corepack enable` 即可用 `yarn`（版本由 `package.json` 的 `packageManager` 鎖定 4.x）。**勿用 npm**（會產生多餘 `package-lock.json`）。CI 安裝用 `yarn install --immutable`。Yarn v4 不跑自訂 `pre*`/`post*` script；build 產物清理由 Vite `emptyOutDir` 處理（無 `clean` script）。Yarn v4 script 是 portable shell，跨平台支援 `VAR=1 cmd` 行內環境變數（`record:cassette` 用此，勿再引入 cross-env）。
 - dev server 內建 `/bbs` WebSocket proxy，改寫 Origin→term.ptt.cc，直連 `wss://ws.ptt.cc/bbs`。開頁即自動連真 PTT，**不需任何中繼**。
 - dev 預設站台 `wstelnet://localhost:8080/bbs`（vite.config.mjs `define` → `DEFAULT_SITE`）。
@@ -34,14 +34,24 @@ BBS 畫面每收到一頁就整份重畫，React 在這裡只剩成本（實錄�
 - 偏好雲端同步：`src/js/pref_sync.js`（Google 登入 + Firestore `users/{uid}`，npm modular SDK 走 dynamic `import()` 拆 lazy chunk，未登入零下載；密碼絕不上雲）。儲存層 `src/js/pref_storage.js`。App Check（reCAPTCHA Enterprise）擋 script 直打 API 燒額度；dev 走 debug token（機器 env `APPCHECK_DEBUG_TOKEN`，**不入 repo**）。詳見 `docs/pref-sync-firestore.md`。
 
 ## 測試
-- **Unit（首選，穩定）**：`yarn test:unit`（Vitest，不連網；設定 `vitest.config.mjs` unit project）。**預設 node env＋`threads` pool**，需要 DOM 的檔案第一行寫 `// @vitest-environment jsdom`（jsdom 每檔重建是最大成本，純邏輯檔別宣告；守護 `tests/unit/unit_environment.test.js`）。`tests/unit/` 30+ 檔＝
-  純邏輯（解析／狀態機／轉碼）＋核心畫面渲染（`tests/unit/helpers/mount_screen.js` 掛 `ScreenController`／
-  `buildRow` + 假 TermChar；週邊 React UI 仍用 @testing-library/react）。
+- **Unit（首選，穩定）**：`yarn test:unit`（Vitest，不連網；設定 `vitest.config.mjs`）＝兩個 project：
+  `unit`（node env＋`threads` pool，純邏輯／解析／靜態掃描）與 `unit-browser`（**Vitest Browser Mode，真 headless
+  Chromium**，DOM／渲染／React 週邊 UI）。需要 DOM 的檔案**第一行**寫 `// @unit-env browser`（純邏輯檔別寫）；
+  **本機需先 `yarn playwright install chromium`**（e2e 本來就要）。守護 `tests/unit/unit_environment.test.js`。
+  - browser 檔**不能用 node API**（`fs`／`path`／`Buffer`／`require`／`__dirname`／`global`）：fixture 用 JSON
+    或 `?raw` import，寫檔用 `vitest/browser` 的 `commands`（`render_dom_equivalence.test.js` 範例），`global`→`globalThis`。
+  - 真瀏覽器的唯讀全域（`navigator.credentials`、`window`）不能賦值：用 `Object.defineProperty`／`vi.spyOn`
+    （`tests/unit/helpers/credential_api.js`）。版面是真的：要 `scrollTop` 就給元素真的高度＋overflow，不准偽造
+    `scrollHeight`／`offsetTop`。`IntersectionObserver` 是真的且非同步，要同步控制就 stub 或注入假的。
+  - `vi.resetModules()` 在 browser 無效（原生 ESM 不重跑模組）：有 page-lifetime 快取的模組改 export 測試用
+    reset 函式（`auto_login.js#_resetSessionCredentialForTest`）。**jsdom／happy-dom 已移除且禁止帶回**（DOM 模擬跟真
+    瀏覽器不一致時測試全綠、實際卻壞；`yarn debug:screens` 也改純 node）。評估與實測見 `docs/build-modernization.md`。
+  `tests/unit/` ＝純邏輯（解析／狀態機／轉碼）＋核心畫面渲染（`tests/unit/helpers/mount_screen.js` 掛
+  `ScreenController`／`buildRow` + 假 TermChar；週邊 React UI 仍用 @testing-library/react）。
   **含 JSX 的測試檔用 `.test.jsx`**。mock/timer 用 `vi.*`（globals 開啟，`describe/test/expect` 免 import）。
   **模組載入一律放檔案層級，不准在 test body 裡 `await import('../../src/...')`**：那會把整條依賴鏈的
   冷載入算進該 case 的 5000ms testTimeout ⇒ 機器忙時偶發紅（`Test timed out in 5000ms`），單獨重跑又綠，
-  而且紅的是一支跟載入無關的測試名稱。唯一例外是模組有 page-lifetime 快取、必須配 `vi.resetModules()`
-  重載（如 `auto_login_credentials.test.js`）。靜態守護 `tests/unit/module_load_cost.test.js`。
+  而且紅的是一支跟載入無關的測試名稱。靜態守護 `tests/unit/module_load_cost.test.js`。
   增強功能的逐列判斷一律放 `comment_parse.annotateComment` 並在此回歸守護（e2e 素材不穩，純邏輯先測）。
 - **Integration（雲端同步流程）**：`yarn test:integration`（Vitest + 官方 **Firebase Emulator Suite**：真 modular SDK
   + Auth/Firestore emulator + 真 `firestore.rules`，無 mock）。emulator 跑在 **Docker**（pinned `andreysenov/firebase-tools`，內含 firebase-tools+JDK；vitest 在 host 連容器埠），所以**本機跑需 Docker**（不再需本機裝 Java/firebase-tools）。orchestration 見 `scripts/run-integration.mjs`。
@@ -106,7 +116,7 @@ BBS 畫面每收到一頁就整份重畫，React 在這裡只剩成本（實錄�
   對照表、豁免與量到的瀏覽器事實見 `tests/e2e/README.md`「真輸入」。改成真輸入後變紅，先懷疑原測試在說謊。
 - **改到渲染/畫面這類易壞 code，提交前必跑 e2e**（`yarn test:e2e`，至少 `easy-reading.spec.js`+`enhance.spec.js`）。
   適用 `term_view.js`、`term_ui.js`、`src/render/**`、`src/components/**`、`easy_reading.js`、`pttchrome.jsx` 渲染/切換路徑、`term_buf.js` 渲染相關等。
-  理由：unit（jsdom + testing-library）仍**不跑真瀏覽器/真 WebSocket/完整 boot 鏈**，捕捉不到「一進文章即炸」這類 runtime 崩潰
+  理由：unit（unit-browser 雖是真 Chromium，但只掛單一元件）仍**不跑真 WebSocket/完整 boot 鏈**，捕捉不到「一進文章即炸」這類 runtime 崩潰
   （例：`pageLines` 用 `JSON` 克隆剝掉 TermChar prototype 方法 → `ch.isStartOfURL is not a function`）。不可只靠 unit + build 綠就交付。
 - **離線重放（不連真實 PTT 也能驗依賴特定文章的 case）**：`yarn test:e2e:offline`（stub WebSocket 重放 byte cassette，
   真瀏覽器/真渲染）；Layer2 `tests/unit/replay_fixture.test.js` 用真實 `findPageOverlap` 純 node 重建跨頁去重。
@@ -157,15 +167,23 @@ BBS 畫面每收到一頁就整份重畫，React 在這裡只剩成本（實錄�
 - **PTT 邏輯不准猜**：PTT 行為邏輯一律先讀 `3rd_script/pttbbs` 原始碼找出真實實作，禁止自行猜測或從錄製素材/畫面觀察反推規則；素材只用來驗證對 code 的理解是否有誤。詳見 `docs/pttbbs-screen-protocol.md` 開頭「研究方法規範」。
 - 編碼：PTT 是 Big5，內部轉 Unicode（`string_util.js` 的 `b2u`/`u2b`，查 `window.lib.b2uArray/u2bArray`）。
 - 改 `src/components/**` 會被 husky + lint-staged 跑 prettier。
-- docs：`docs/run-local.md`(啟動)、`docs/pttchrome-research.md`(來源＋Origin 白名單根本約束)、`docs/origin-rewrite-extension.md`(部署 Origin 改寫)、`docs/enhanced-addon.md`(黑名單/樓層/推文合併/自動登入整合＋活躍踩坑)、`docs/easy-reading.md`(文章好讀模式：settle 狀態機/render 單軌/functionMode)、`docs/easy-reading-list.md`(列表好讀模式 v5 架構：合約/狀態機/關鍵不變量；改 list_session.js/command_queue.js/term_buf settle 前先讀)、`docs/easy-reading-list-research.md`(該功能為何結構性地難＋App 式重設計選項；決定方向前先讀)、`docs/pttbbs-screen-protocol.md`(PTT server 畫面協定不變量，pttbbs source 逆向；畫面偵測規則依據)、`docs/offline-replay-testing.md`(cassette 錄製/重放/隱私)、`docs/pref-sync-firestore.md`(偏好雲端同步＋Firebase 平台踩坑)、`docs/media-preview-addons.md`(第三方預覽套件的圖床 roster／referer 規則對照)、`docs/ptt-official-app-research.md`(官方組織專案盤點＋推文終端格式交叉驗證)、`docs/merge-caption-ai-assist.md`(裝置端 AI 輔助配對：已實作 opt-in＋實測數據；AI 設定總開關與分頁見 `docs/enhanced-addon.md`「設定」節)、`docs/build-modernization.md`(依賴／工具選型基準；動建置鏈或評估換依賴前先讀)、`docs/imgur-latency-research.md`(imgur／twimg／catbox 台灣連線慢的根因量測＋Cloudflare Worker 代理實測；碰圖片載入效能或圖片代理前先讀，勿重做量測)、`docs/mouse.md`(滑鼠總體設計：pref schema／區域決策表／gating 表／點擊優先權／左側退出提示帶的座標契約；動 mouse_regions.js 或任何滑鼠入口前先讀)、`docs/deep-link.md`(外部連結→AID 跳轉：URL 合約／登入前暫存排程／BroadcastChannel 交接／PWA launch_handler／瀏覽器硬限制；動 deep_link*.js 前先讀)、`docs/image-upload.md`(圖片上傳到 urusai 圖床：API 合約／CORS 實測／插入位置決策表／浮層與滑鼠讓位規則；動 image_upload*.js 或上傳浮層前先讀)、`docs/board-list-smooth-scroll.md`(看板列表平滑捲動：範圍指紋／為何抓頁不用 PgUp,PgDn／兩個列表 session 的所有權層；動 board_list*.js 或 term_view 的看板列表分支前先讀)、`docs/long-push.md`(長推文一鍵發送：位移模型／畫面決策表／不變量（不送 \f、段末全形留 1 byte、非 Big5 必濾）；動 long_push*.js 前先讀，PTT 端協定見 `docs/pttbbs-screen-protocol.md` §11.3)、`docs/terminal-size.md`(終端機大小兩模式／NAWS 與 server 端 clamp／欄數恆 80 與水平置中的 LOCKED 條款；動 term_size.js、setTermFontSize 或任何「畫面靠左/置中」的念頭前先讀)、`docs/android-app.md`(Android APK：WebView 殼＋前景服務本機 proxy＋原生密碼管理員 bridge／不寫回 prefs／origin 與 token 鎖／assetlinks／建置發佈；動 android/**、android_bridge.js、credential_store.js、boot_site.js 前先讀)、`docs/ptt-announcement-bot.md`(PttCurrent 公告→issue→Claude routine 的 Cloudflare Worker cron bot；動 proxy/ptt-announcements-worker 或 scripts/ptt-announcements.mjs 前先讀)、`docs/mobile.md`(手機版面：分階段狀態／runtime 覆寫不寫回 prefs／`#t` inputmode／按鍵列送鍵規則；動 mobile_layout.js、MobileKeypad 或任何觸控相關前先讀)。
+- docs：`docs/run-local.md`(啟動)、`docs/pttchrome-research.md`(來源＋Origin 白名單根本約束)、`docs/origin-rewrite-extension.md`(部署 Origin 改寫)、`docs/enhanced-addon.md`(黑名單/樓層/推文合併/自動登入整合＋活躍踩坑)、`docs/easy-reading.md`(文章好讀模式：settle 狀態機/render 單軌/functionMode)、`docs/easy-reading-list.md`(列表好讀模式 v5 架構：合約/狀態機/關鍵不變量；改 list_session.js/command_queue.js/term_buf settle 前先讀)、`docs/easy-reading-list-research.md`(該功能為何結構性地難＋App 式重設計選項；決定方向前先讀)、`docs/pttbbs-screen-protocol.md`(PTT server 畫面協定不變量，pttbbs source 逆向；畫面偵測規則依據)、`docs/offline-replay-testing.md`(cassette 錄製/重放/隱私)、`docs/pref-sync-firestore.md`(偏好雲端同步＋Firebase 平台踩坑)、`docs/media-preview-addons.md`(第三方預覽套件的圖床 roster／referer 規則對照)、`docs/ptt-official-app-research.md`(官方組織專案盤點＋推文終端格式交叉驗證)、`docs/merge-caption-ai-assist.md`(裝置端 AI 輔助配對：已實作 opt-in＋實測數據；AI 設定總開關與分頁見 `docs/enhanced-addon.md`「設定」節)、`docs/build-modernization.md`(依賴／工具選型基準；動建置鏈或評估換依賴前先讀)、`docs/imgur-latency-research.md`(imgur／twimg／catbox 台灣連線慢的根因量測＋Cloudflare Worker 代理實測；碰圖片載入效能或圖片代理前先讀，勿重做量測)、`docs/mouse.md`(滑鼠總體設計：pref schema／區域決策表／gating 表／點擊優先權／左側退出提示帶的座標契約；動 mouse_regions.js 或任何滑鼠入口前先讀)、`docs/deep-link.md`(外部連結→AID 跳轉：URL 合約／登入前暫存排程／BroadcastChannel 交接／PWA launch_handler／瀏覽器硬限制；動 deep_link*.js 前先讀)、`docs/image-upload.md`(圖片上傳到 urusai 圖床：API 合約／CORS 實測／插入位置決策表／浮層與滑鼠讓位規則；動 image_upload*.js 或上傳浮層前先讀)、`docs/board-list-smooth-scroll.md`(看板列表平滑捲動：範圍指紋／為何抓頁不用 PgUp,PgDn／兩個列表 session 的所有權層；動 board_list*.js 或 term_view 的看板列表分支前先讀)、`docs/long-push.md`(長推文一鍵發送：位移模型／畫面決策表／不變量（不送 \f、段末全形留 1 byte、非 Big5 必濾）；動 long_push*.js 前先讀，PTT 端協定見 `docs/pttbbs-screen-protocol.md` §11.3)、`docs/terminal-size.md`(終端機大小兩模式／NAWS 與 server 端 clamp／欄數恆 80 與水平置中的 LOCKED 條款；動 term_size.js、setTermFontSize 或任何「畫面靠左/置中」的念頭前先讀)、`docs/android-app.md`(Android APK：WebView 殼＋前景服務本機 proxy＋原生密碼管理員 bridge／不寫回 prefs／origin 與 token 鎖／assetlinks／建置發佈；動 android/**、android_bridge.js、credential_store.js、boot_site.js 前先讀)、`docs/ptt-announcement-bot.md`(PttCurrent 公告→issue→Claude routine 的 Cloudflare Worker cron bot；動 proxy/ptt-announcements-worker 或 scripts/ptt-announcements.mjs 前先讀)、`docs/mobile.md`(手機版面：分階段狀態／runtime 覆寫不寫回 prefs／`#t` inputmode／按鍵列送鍵規則；動 mobile_layout.js、MobileKeypad 或任何觸控相關前先讀)、`docs/android-e2e.md`(真 Android Chrome 模擬器 e2e：`yarn test:e2e:android`／exit 0/1/2／本機 WHPX＋SDK 設定／模擬器踩坑表；寫 android spec 或動 tests/e2e/android 前先讀)。
 - **使用者給 debug 錄製檔（`ptt-debug-*.json`）一律先用 `yarn debug:screens`**（`scripts/debug-screens.mjs`）：
   不帶時間點＝時間軸（send 解成可讀字串＋log，`--from/--to` 截段）；帶時間點（ms）＝印出那一刻的**畫面**
   （app 自己的 TermBuf/AnsiParser 經 Vite ssrLoadModule 載入，列數取 `cassette.rows`）。**不要另寫迷你 VT**：
   2026-09-24 臨時手寫的版本把 `351661` 解成 `2026661`、多出 `116;18H…` 殘渣，看起來像 PTT 送的。
   錄製是中途開始的，第一次整頁重繪前的畫面不完整。守護 `tests/unit/debug_screens.test.js`。
 - 待辦交接：`docs/handoff/`，一個 `.md` = 一個尚未完成的功能/修復；挑一個做完即**刪掉該 md**。詳見 `docs/handoff/README.md`。
-- git 規則依執行環境分兩套（判準：env `CLAUDE_CODE_REMOTE=true` ＝雲端 session，Claude Code on the web；否則＝本機）：
-  - **本機**：**不開新功能分支**，直接在現有分支（`dev`）修改；**不主動 commit**（等使用者說）。
+- git 規則依執行環境分三套（判準：env `CLAUDE_CODE_REMOTE=true` ＝雲端 session，Claude Code on the web；
+  否則 `.git` 是檔案且指向 `.git/worktrees/` ＝本機 worktree（`scripts/worktree.js#isLinkedWorktree`）；其餘＝本機主目錄）：
+  - **本機主目錄**：**不開新功能分支**，直接在現有分支（`dev`）修改；**不主動 commit**（等使用者說）。
+  - **本機 worktree（多 session 並行）**：測試只跑 `yarn test:unit`（自動限流 `maxWorkers` 2、`testTimeout` 20s）；
+    e2e／integration／record／android 由 `scripts/worktree.js` 以 **exit 2 拒絕**（會搶 8080／Docker 容器／PTT 登入預算／CPU，
+    且 Playwright `reuseExistingServer` 會靜默測到主目錄的 code）。逃生門 `ALLOW_WORKTREE_E2E=1` 只在使用者確認主目錄沒在跑測試時用。
+    ⇒ 自己開分支 `claude/<主題>`、commit、push、開 PR 到 `dev`，`yarn ci:status --branch <分支>` loop 修到全綠。
+    停止條件：失敗與被測 code 無關 ⇒ 照 `docs/ci-troubleshooting.md` 判斷／`--rerun-failed`，不改 code；
+    同一個失敗修 3 輪仍紅 ⇒ 停手回報。**不自行合併**（等使用者）。live e2e 由主目錄 session 合回 `dev` 後統一跑一輪（登入預算）。
+    「改渲染提交前必跑 e2e」在 worktree 以 CI 的 offline＋adverse 代替，交付時註明 live 未跑。
   - **雲端 session**：以 session 指定的工作分支（通常 `claude/*`）為準，**不要切回或直推 `dev`**；
     做完**要自己 commit＋push 到該分支**（雲端容器結束即銷毀，沒 push＝工作全丟），需要時開 PR 到 `dev`。
     上面兩條本機規則在雲端**不適用**；其餘 commit 前檢查（隱私 `git diff` 自查、`--stat` 行數相稱、補測試、README 新功能列表）照舊。

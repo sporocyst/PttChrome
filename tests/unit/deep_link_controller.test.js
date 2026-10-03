@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @unit-env browser
 // Unit tests for DeepLinkController (src/js/deep_link_controller.js): 決定
 // 「什麼時候可以跳」與「用哪個入口跳」。AidNavigation 用假物件（它自己的序列
 // 已經在 aid_navigation.test.js 驗過了），這裡守的是排程行為。
@@ -549,11 +549,11 @@ describe("網址列自動同步", () => {
 
   // history_back_guard 的 sentinel 把身分記在 history.state 裡，而我們改的正是
   // 使用者站著的那一層 ⇒ 傳 null 會把它洗成一般 entry，guard 從此認不出「落回
-  // 自己那一層」（回歸鎖，2026-09-05）。真的 jsdom history，不 stub。
+  // 自己那一層」（回歸鎖，2026-09-05）。真的瀏覽器 history，不 stub。
   test("_replaceState 只改網址，不動 history.state", () => {
     const h = makeHarness();
     const sentinel = { pttchromeBackGuard: 7 };
-    // jsdom 的 origin 不是 example.github.io，pushState 跨 origin 會 throw ⇒
+    // 測試頁的 origin 不是 example.github.io，pushState 跨 origin 會 throw ⇒
     // 用當前 origin 組網址（本測試只在乎 state，不在乎主機名）。
     const base = window.location.origin + "/pttchrome/";
     window.history.pushState(sentinel, "", base);
